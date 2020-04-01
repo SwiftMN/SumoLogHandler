@@ -92,8 +92,9 @@ _sourceName=sweet-project-name/*
 The log messages will look something like this
 ```
 {
-  "file": "MyClassName:62",
+  "fileName": "MyClassName",
   "function": "myFunctionName(someVariable:)",
+  "lineNumber": "62",
   "logLevel": "info",
   "machine": "iPad7,12",
   "message": "This is a log message",
