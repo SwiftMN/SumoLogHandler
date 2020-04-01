@@ -9,7 +9,7 @@ It does not print to the console so you can use whatever LogHandler you want for
 
 add this to your `dependencies` list
 ```swift
-.package(url: "https://github.com/SwiftMN/SumoLogHandler.git", from: "1.0.0")
+.package(url: "https://github.com/SwiftMN/SumoLogHandler.git", from: "2.0.0")
 ```
 
 and of course add `"EmojiLogHandler"` to your list target dependencies
@@ -32,22 +32,25 @@ https://github.com/SwiftMN/SumoLogHandler
 In your AppDelegate or SceneDelegate, bootstrap an instance of `SumoLogHandler`.
 
 ```swift
-if
-  let sumoUrl = URL(string: sumoUrlString),
-  let appName = Bundle.main.infoDictionary?["CFBundleName"] as? String,
-  let appVersion = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String,
-  let buildNumber = Bundle.main.infoDictionary?["CFBundleVersion"] as? String
-{
+if let sumoUrl = URL(string: sumoUrlString) {
+
+  let appName = Bundle.main.infoDictionary?["CFBundleName"] as? String ?? "*"
+  let appVersion = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "*"
+  let buildNumber = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "*"
+
   LoggingSystem.bootstrap { label in
     MultiplexLogHandler([
       EmojiLogHandler(label),
       SumoLogHandler(
         label: label,
         sumoUrl: sumoUrl,
-        sumoName: "\(appName)/\(appVersion)/\(buildNumber)"
+        sourceName: "\(appName)/\(appVersion)/\(buildNumber)"
       )
     ])
   }
+  
+  // make sure you register all handlers before setting logLevel since logger.logLevel just forwards to the handlers
+  logger.logLevel = .info
 }
 ```
 
@@ -84,6 +87,20 @@ You can then query SumoLogic with things like
 _sourceCategory=prod/mobile
 _sourceHost=ios
 _sourceName=sweet-project-name/*
+```
+
+The log messages will look something like this
+```
+{
+  "file": "MyClassName:62",
+  "function": "myFunctionName(someVariable:)",
+  "logLevel": "info",
+  "machine": "iPad7,12",
+  "message": "This is a log message",
+  "systemName": "iOS",
+  "systemVersion": "13.4",
+  "timestamp": "2020-04-01T07:58:30.506-0500"
+}
 ```
 
 
