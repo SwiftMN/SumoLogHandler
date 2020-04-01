@@ -2,14 +2,17 @@ import Logging
 import Foundation
 import Gzip
 import ThreadSafeCollections
+import UIKit
 
 private struct LogJson: Codable {
   let message: String
   let timestamp: String
   let logLevel: String
-  let thread: String
   let file: String
   let function: String
+  let machine: String
+  let systemName: String
+  let systemVersion: String
 }
 
 public class SumoLogHandler: LogHandler {
@@ -18,33 +21,44 @@ public class SumoLogHandler: LogHandler {
   public var logLevel: Logger.Level = .debug
   public let label: String
   public let sumoUrl: URL
-  public let sumoName: String
-  public let sumoHost: String
-  public var sumoCategory: String
+  public let sourceName: String
+  public let sourceHost: String
+  public var sourceCategory: String
   public let dateFormatter: DateFormatter
   public var thresholdPoints: Int = 10
   
   private var urlSession = URLSession(configuration: URLSessionConfiguration.default)
-  
   private var currentLogs = ThreadSafeList<String>()
   private var currentPoints = 0
-  
+  private let machine: String
+  private let systemName: String
+  private let systemVersion: String
+
   public init(
-    label: String, // some swift-log thing?
+    label: String, // swift-log requires this
     sumoUrl: URL,
-    sumoName: String,
-    sumoHost: String = "ios",
-    sumoCategory: String = "prod/mobile",
+    sourceName: String,
+    sourceHost: String = "ios",
+    sourceCategory: String = "prod/mobile",
     dateFormatString: String = "yyyy-MM-dd'T'HH:mm:ss.SSSZ"
   ) {
     self.label = label
     self.sumoUrl = sumoUrl
-    self.sumoName = sumoName
-    self.sumoHost = sumoHost
-    self.sumoCategory = sumoCategory
+    self.sourceName = sourceName
+    self.sourceHost = sourceHost
+    self.sourceCategory = sourceCategory
     let formatter = DateFormatter()
     formatter.dateFormat = dateFormatString
     self.dateFormatter = formatter
+    
+    var systemInfo = utsname()
+    uname(&systemInfo)
+    self.machine = withUnsafeBytes(of: &systemInfo.machine) { rawPtr -> String in
+      let ptr = rawPtr.baseAddress!.assumingMemoryBound(to: CChar.self)
+      return String(cString: ptr)
+    }
+    self.systemName = UIDevice.current.systemName
+    self.systemVersion = UIDevice.current.systemVersion
   }
 
   public func log(level: Logger.Level, message: Logger.Message, metadata: Logger.Metadata?, file: String, function: String, line: UInt) {
@@ -52,13 +66,12 @@ public class SumoLogHandler: LogHandler {
       print("not processing message with level = \(level)")
       return
     }
-    let threadName = Thread.current.name ?? Thread.current.description
     DispatchQueue.global(qos: .background).async {
-      self.process(level: level, message: message, metadata: metadata, file: file, function: function, line: line, threadName: threadName)
+      self.process(level: level, message: message, metadata: metadata, file: file, function: function, line: line)
     }
   }
   
-  private func process(level: Logger.Level, message: Logger.Message, metadata: Logger.Metadata?, file: String, function: String, line: UInt, threadName: String) {
+  private func process(level: Logger.Level, message: Logger.Message, metadata: Logger.Metadata?, file: String, function: String, line: UInt) {
 
     var fileName = file
     if let fileWithoutExtension = file.components(separatedBy: "/").last?.components(separatedBy: ".").first {
@@ -69,9 +82,11 @@ public class SumoLogHandler: LogHandler {
       message: "\(message)",
       timestamp: dateFormatter.string(from: Date()),
       logLevel: level.rawValue,
-      thread: threadName,
       file: "\(fileName):\(line)",
-      function: function
+      function: function,
+      machine: self.machine,
+      systemName: self.systemName,
+      systemVersion: self.systemVersion
     )
     
     guard let encoded = try? JSONEncoder().encode(json) else {
@@ -108,9 +123,9 @@ public class SumoLogHandler: LogHandler {
 
     var request = URLRequest(url: sumoUrl)
     request.setValue("gzip", forHTTPHeaderField: "Content-Encoding")
-    request.setValue(sumoName, forHTTPHeaderField: "X-Sumo-Name")
-    request.setValue(sumoHost, forHTTPHeaderField: "X-Sumo-Host")
-    request.setValue(sumoCategory, forHTTPHeaderField: "X-Sumo-Category")
+    request.setValue(sourceName, forHTTPHeaderField: "X-Sumo-Name")
+    request.setValue(sourceHost, forHTTPHeaderField: "X-Sumo-Host")
+    request.setValue(sourceCategory, forHTTPHeaderField: "X-Sumo-Category")
     request.httpMethod = "POST"
 
     let singleLog = logs.joined(separator: "\n")
