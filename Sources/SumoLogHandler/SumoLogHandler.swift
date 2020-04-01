@@ -8,7 +8,8 @@ private struct LogJson: Codable {
   let message: String
   let timestamp: String
   let logLevel: String
-  let file: String
+  let fileName: String
+  let lineNumber: String
   let function: String
   let machine: String
   let systemName: String
@@ -82,7 +83,8 @@ public class SumoLogHandler: LogHandler {
       message: "\(message)",
       timestamp: dateFormatter.string(from: Date()),
       logLevel: level.rawValue,
-      file: "\(fileName):\(line)",
+      fileName: fileName,
+      lineNumber: "\(line)",
       function: function,
       machine: self.machine,
       systemName: self.systemName,
